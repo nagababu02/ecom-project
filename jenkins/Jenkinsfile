@@ -1,0 +1,58 @@
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+    }
+
+    environment {
+        SERVICE_DIR = 'application/product-service'
+        IMAGE_NAME = "ecom-product-service:${BUILD_NUMBER}"
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build and Test') {
+            steps {
+                sh 'java -version'
+                sh 'mvn -B -f application/product-service/pom.xml clean verify'
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: 'application/product-service/target/surefire-reports/*.xml'
+                }
+            }
+        }
+
+        stage('Build Container Image') {
+            steps {
+                sh 'docker build --tag "$IMAGE_NAME" --file application/product-service/Dockerfile application/product-service'
+            }
+        }
+
+        stage('Image Scan') {
+            when {
+                expression { fileExists('jenkins/ENABLE_TRIVY_SCAN') }
+            }
+            steps {
+                sh 'trivy image --exit-code 1 --severity HIGH,CRITICAL "$IMAGE_NAME"'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Build, tests and image build completed. No cloud deployment was performed.'
+        }
+        always {
+            sh 'docker image rm "$IMAGE_NAME" || true'
+        }
+    }
+}
