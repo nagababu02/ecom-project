@@ -1,0 +1,11 @@
+services:
+  product-service:
+    build:
+      context: ./application/product-service
+      dockerfile: Dockerfile
+    image: ecom-product-service:local
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+    restart: unless-stopped
