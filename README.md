@@ -115,6 +115,16 @@ docker run --rm -p 8080:8080 ecom-product-service:local
 
 In another terminal, try `http://localhost:8080/api/products` and `http://localhost:8080/actuator/health`. See the [service guide](application/product-service/README.md) for details.
 
+### Run with Docker Compose
+
+From the repository root:
+
+~~~bash
+docker compose up --build
+~~~
+
+Stop the local service with `Ctrl+C`, then run `docker compose down`.
+
 ### Local-first workflow
 
 1. Clone this repository.
@@ -137,15 +147,15 @@ AWS resources are **not** created merely by cloning this repository. Terraform c
 
 ## Project status
 
-**Status: application foundation implemented; CI verification in progress.** The product service, tests, and Docker build definition are committed. The GitHub Actions result still needs to be checked before claiming the build passes. No production deployment or performance/security result is claimed by this README.
+**Status: application and pipeline foundations committed; CI verification in progress.** The product service, integration tests, multi-stage Dockerfile, Compose workflow, and Jenkins pipeline example are committed. The GitHub Actions result still needs to be checked before claiming the build passes. No production deployment or performance/security result is claimed by this README.
 
 ## Roadmap
 
 - [x] Add a Java/Maven service and API integration tests
 - [x] Add a multi-stage Dockerfile
 - [x] Add GitHub Actions build and test workflow
-- [ ] Add local Compose-based development
-- [ ] Add Jenkins pipeline example
+- [x] Add local Compose-based development
+- [x] Add Jenkins pipeline example
 - [ ] Add SonarQube and Trivy integration
 - [ ] Add Terraform modules and AWS deployment configuration
 - [ ] Add Kubernetes manifests, health probes, resource requests and limits
