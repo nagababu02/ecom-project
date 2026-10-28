@@ -31,6 +31,14 @@ The first runnable component is a Java 17 / Spring Boot product service.
 
 See [the product service guide](application/product-service/README.md) for local commands.
 
+## Kubernetes manifests
+
+Kubernetes deployment manifests are now committed under [kubernetes/](kubernetes/).
+
+The current base includes a Namespace, ConfigMap, ClusterIP Service, two-replica Deployment, rolling-update strategy, resource requests/limits, startup/readiness/liveness probes, container hardening, HorizontalPodAutoscaler, AWS Load Balancer Controller Ingress, and Kustomize configuration.
+
+See [the Kubernetes guide](kubernetes/README.md) for rendering, deployment, and EKS prerequisites. The manifests are version-controlled as the desired state, consistent with Kubernetes configuration best practices. No EKS resources have been created by these commits.
+
 ## Target architecture
 
 ~~~text
@@ -46,10 +54,10 @@ Developer -> GitHub -> GitHub Actions / Jenkins
                     Amazon ECR
                          |
                   Amazon EKS
-                 /           \
+                 /           \\
           Kubernetes       Argo CD
           Services         GitOps sync
-                 \           /
+                 \\           /
                  Metrics / Logs
                   Prometheus
                     Grafana
@@ -85,10 +93,9 @@ A technology listed here is part of the project target; its presence does not by
 ├── .github/workflows/   # Automated build, test and validation
 ├── application/
 │   └── product-service/ # Spring Boot API, tests and Dockerfile
-├── docker/              # Shared container assets as needed
-├── jenkins/             # Jenkins pipeline (planned)
+├── jenkins/             # Jenkins pipeline and guidance
+├── kubernetes/          # Kubernetes workload manifests
 ├── terraform/           # AWS infrastructure as code (planned)
-├── kubernetes/          # Kubernetes workload manifests (planned)
 ├── argocd/              # GitOps application definitions (planned)
 ├── monitoring/          # Metrics and dashboard configuration (planned)
 └── docs/                # Architecture, deployment, operations and cost notes
@@ -130,8 +137,9 @@ Stop the local service with `Ctrl+C`, then run `docker compose down`.
 1. Clone this repository.
 2. Review the architecture and cost guidance.
 3. Run the automated build and tests before considering a cloud deployment.
-4. Review the Terraform plan, expected costs, permissions, and teardown procedure before provisioning anything.
-5. Deploy to AWS only when the environment is deliberately configured and approved.
+4. Render and review the Kubernetes manifests before cluster deployment.
+5. Review the Terraform plan, expected costs, permissions, and teardown procedure before provisioning anything.
+6. Deploy to AWS only when the environment is deliberately configured and approved.
 
 AWS resources are **not** created merely by cloning this repository. Terraform commands that create or change infrastructure can incur charges.
 
@@ -147,7 +155,7 @@ AWS resources are **not** created merely by cloning this repository. Terraform c
 
 ## Project status
 
-**Status: application and pipeline foundations committed; CI verification in progress.** The product service, integration tests, multi-stage Dockerfile, Compose workflow, and Jenkins pipeline example are committed. The GitHub Actions result still needs to be checked before claiming the build passes. No production deployment or performance/security result is claimed by this README.
+**Status: application, CI/CD foundations, and Kubernetes manifests committed; CI verification in progress.** The product service, tests, Dockerfile, Compose workflow, Jenkins pipeline example, and Kubernetes base are committed. The GitHub Actions result still needs to be checked before claiming the build passes. No production deployment or performance/security result is claimed by this README.
 
 ## Roadmap
 
@@ -156,9 +164,10 @@ AWS resources are **not** created merely by cloning this repository. Terraform c
 - [x] Add GitHub Actions build and test workflow
 - [x] Add local Compose-based development
 - [x] Add Jenkins pipeline example
+- [x] Add Kubernetes manifests with probes, resources and HPA
 - [ ] Add SonarQube and Trivy integration
 - [ ] Add Terraform modules and AWS deployment configuration
-- [ ] Add Kubernetes manifests, health probes, resource requests and limits
+- [ ] Add ECR image publishing with immutable tags
 - [ ] Add Argo CD GitOps configuration
 - [ ] Add Prometheus/Grafana dashboards and alert examples
 - [ ] Document deployment, rollback, troubleshooting and teardown
