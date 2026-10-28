@@ -1,4 +1,4 @@
-name: Repository validation
+name: Product service CI
 
 on:
   push:
@@ -9,15 +9,19 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: product-service-ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  validate:
-    name: Validate repository basics
+  validate-and-test:
+    name: Validate and test
     runs-on: ubuntu-latest
     steps:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Check for whitespace errors
+      - name: Check whitespace errors
         run: git diff --check
 
       - name: Verify required documentation
@@ -26,10 +30,25 @@ jobs:
           test -s CONTRIBUTING.md
           test -s docs/architecture.md
           test -s docs/cost-management.md
+          test -s application/product-service/pom.xml
 
       - name: Ensure no obvious credential files are tracked
+        shell: bash
         run: |
           if git ls-files | grep -E '(^|/)(\.env|credentials|id_rsa|.*\.pem|.*\.key)$'; then
             echo "::error::Potential secret or credential file is tracked. Review the matched paths."
             exit 1
           fi
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Build and test with Maven
+        run: mvn -B -f application/product-service/pom.xml clean verify
+
+      - name: Build Docker image
+        run: docker build --tag ecom-product-service:ci --file application/product-service/Dockerfile application/product-service
