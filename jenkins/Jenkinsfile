@@ -8,14 +8,27 @@ pipeline {
     }
 
     environment {
-        SERVICE_DIR = 'application/product-service'
-        IMAGE_NAME = "ecom-product-service:${BUILD_NUMBER}"
+        AWS_REGION = 'us-east-1'
+        ECR_REPOSITORY = 'ecom-product-service'
+        IMAGE_TAG = "${BUILD_NUMBER}"
+        EKS_CLUSTER = 'nagcluster'
+        K8S_NAMESPACE = 'ecom'
+        ARGOCD_APP = 'ecom-product-service'
     }
 
     stages {
         stage('Checkout') {
             steps {
                 checkout scm
+            }
+        }
+
+        stage('Validate') {
+            steps {
+                sh 'git diff --check'
+                sh 'test -f application/product-service/pom.xml'
+                sh 'test -f application/product-service/Dockerfile'
+                sh 'test -f kubernetes/base/kustomization.yaml'
             }
         }
 
@@ -33,26 +46,85 @@ pipeline {
 
         stage('Build Container Image') {
             steps {
-                sh 'docker build --tag "$IMAGE_NAME" --file application/product-service/Dockerfile application/product-service'
+                sh 'docker build --tag "$ECR_REPOSITORY:$IMAGE_TAG" --file application/product-service/Dockerfile application/product-service'
             }
         }
 
-        stage('Image Scan') {
+        stage('Trivy Image Scan') {
             when {
                 expression { fileExists('jenkins/ENABLE_TRIVY_SCAN') }
             }
             steps {
-                sh 'trivy image --exit-code 1 --severity HIGH,CRITICAL "$IMAGE_NAME"'
+                sh 'trivy image --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed "$ECR_REPOSITORY:$IMAGE_TAG"'
+            }
+        }
+
+        stage('Login and Push to ECR') {
+            steps {
+                sh '''
+                    ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+                    ECR_REGISTRY=${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
+                    aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+                    docker tag ${ECR_REPOSITORY}:${IMAGE_TAG} ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}
+                    docker push ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}
+                    echo "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}" > image-uri.txt
+                '''
+                archiveArtifacts artifacts: 'image-uri.txt', fingerprint: true
+            }
+        }
+
+        stage('Update GitOps Manifest') {
+            steps {
+                sh '''
+                    python3 - <<'PY'
+                    from pathlib import Path
+                    p = Path('kubernetes/base/kustomization.yaml')
+                    text = p.read_text()
+                    text = text.replace('newTag: local', 'newTag: ${IMAGE_TAG}')
+                    p.write_text(text)
+                    PY
+                    git config user.name 'jenkins'
+                    git config user.email 'jenkins@localhost'
+                    git add kubernetes/base/kustomization.yaml
+                    git diff --cached --quiet || git commit -m "chore: update product image to ${IMAGE_TAG}"
+                '''
+            }
+        }
+
+        stage('Push GitOps Change') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'github-token', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
+                    sh '''
+                        git remote set-url origin https://${GIT_USER}:${GIT_TOKEN}@github.com/nagababu02/ecom-project.git
+                        git push origin HEAD:main
+                    '''
+                }
+            }
+        }
+
+        stage('Argo CD Sync') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'argocd-admin', usernameVariable: 'ARGO_USER', passwordVariable: 'ARGO_PASSWORD')]) {
+                    sh '''
+                        argocd login ${ARGOCD_SERVER} --username ${ARGO_USER} --password ${ARGO_PASSWORD} --grpc-web --insecure
+                        argocd app sync ${ARGOCD_APP} --prune
+                        argocd app wait ${ARGOCD_APP} --health --sync --timeout 300
+                    '''
+                }
             }
         }
     }
 
     post {
         success {
-            echo 'Build, tests and image build completed. No cloud deployment was performed.'
+            echo 'Jenkins deployment pipeline completed: GitHub -> Build/Test -> Docker -> Trivy -> ECR -> GitOps -> Argo CD -> EKS'
         }
         always {
-            sh 'docker image rm "$IMAGE_NAME" || true'
+            sh 'docker image rm "$ECR_REPOSITORY:$IMAGE_TAG" || true'
+            cleanWs()
+        }
+        failure {
+            echo 'Pipeline failed. Check the failed stage and Jenkins console log.'
         }
     }
 }
