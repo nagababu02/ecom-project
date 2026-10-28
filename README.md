@@ -19,6 +19,18 @@ An end-to-end portfolio project demonstrating how to build, secure, deploy, and 
 - Add metrics, dashboards, alerting, and operational runbooks.
 - Keep cloud spend visible and provide explicit teardown instructions.
 
+## Implemented application
+
+The first runnable component is a Java 17 / Spring Boot product service.
+
+- `GET /api/products` — list sample products
+- `GET /api/products/{id}` — retrieve one product
+- `GET /actuator/health` — application health status
+- Maven integration tests cover list, lookup, not-found, and health behavior.
+- A multi-stage Dockerfile builds the service and runs it as a non-root user.
+
+See [the product service guide](application/product-service/README.md) for local commands.
+
 ## Target architecture
 
 ~~~text
@@ -53,7 +65,7 @@ See [the architecture notes](docs/architecture.md) for the intended components a
 |---|---|
 | Source control | Git, GitHub |
 | CI | GitHub Actions; Jenkins pipeline examples |
-| Build | Maven, Java |
+| Build | Maven, Java 17, Spring Boot |
 | Containers | Docker |
 | Image registry | Amazon ECR |
 | Infrastructure as Code | Terraform |
@@ -70,39 +82,46 @@ A technology listed here is part of the project target; its presence does not by
 
 ~~~text
 .
-├── .github/workflows/   # Automated validation
-├── application/         # Microservices source code
-├── docker/              # Container build definitions
-├── jenkins/             # Jenkins pipeline
-├── terraform/           # AWS infrastructure as code
-├── kubernetes/          # Kubernetes workload manifests
-├── argocd/              # GitOps application definitions
-├── monitoring/          # Metrics and dashboard configuration
+├── .github/workflows/   # Automated build, test and validation
+├── application/
+│   └── product-service/ # Spring Boot API, tests and Dockerfile
+├── docker/              # Shared container assets as needed
+├── jenkins/             # Jenkins pipeline (planned)
+├── terraform/           # AWS infrastructure as code (planned)
+├── kubernetes/          # Kubernetes workload manifests (planned)
+├── argocd/              # GitOps application definitions (planned)
+├── monitoring/          # Metrics and dashboard configuration (planned)
 └── docs/                # Architecture, deployment, operations and cost notes
 ~~~
-
-Directories and implementation files will be added as the project is built and tested.
 
 ## Getting started
 
 ### Prerequisites
 
 - Git
-- Docker Desktop or Docker Engine
-- Java and Maven for local application builds
-- Terraform for infrastructure validation
-- kubectl for Kubernetes workflows
-- AWS CLI only for AWS deployment steps
+- JDK 17 and Maven 3.9 or compatible
+- Docker Desktop or Docker Engine for image builds
+- Terraform, kubectl and AWS CLI only for later infrastructure/deployment steps
 
-Exact versions and service-specific setup instructions will be documented alongside each component.
+### Build and test locally
+
+From the repository root:
+
+~~~bash
+mvn -B -f application/product-service/pom.xml clean verify
+docker build -t ecom-product-service:local -f application/product-service/Dockerfile application/product-service
+docker run --rm -p 8080:8080 ecom-product-service:local
+~~~
+
+In another terminal, try `http://localhost:8080/api/products` and `http://localhost:8080/actuator/health`. See the [service guide](application/product-service/README.md) for details.
 
 ### Local-first workflow
 
 1. Clone this repository.
 2. Review the architecture and cost guidance.
-3. Run the repository validation workflow and local tests.
-4. Build and test services locally before considering a cloud deployment.
-5. Provision AWS only after reviewing the plan, expected costs, access permissions, and teardown procedure.
+3. Run the automated build and tests before considering a cloud deployment.
+4. Review the Terraform plan, expected costs, permissions, and teardown procedure before provisioning anything.
+5. Deploy to AWS only when the environment is deliberately configured and approved.
 
 AWS resources are **not** created merely by cloning this repository. Terraform commands that create or change infrastructure can incur charges.
 
@@ -118,15 +137,16 @@ AWS resources are **not** created merely by cloning this repository. Terraform c
 
 ## Project status
 
-**Status: Foundation and documentation in progress.** Features will be marked complete only after their files exist and the relevant checks have been run. No production deployment or performance/security result is claimed by this README.
+**Status: application foundation implemented; CI verification in progress.** The product service, tests, and Docker build definition are committed. The GitHub Actions result still needs to be checked before claiming the build passes. No production deployment or performance/security result is claimed by this README.
 
 ## Roadmap
 
-- [ ] Add a working Java/Maven service and unit tests
-- [ ] Add Dockerfiles and local Compose-based development
-- [ ] Add GitHub Actions build and test workflow
+- [x] Add a Java/Maven service and API integration tests
+- [x] Add a multi-stage Dockerfile
+- [x] Add GitHub Actions build and test workflow
+- [ ] Add local Compose-based development
 - [ ] Add Jenkins pipeline example
-- [ ] Add SonarQube and Trivy integration guidance
+- [ ] Add SonarQube and Trivy integration
 - [ ] Add Terraform modules and AWS deployment configuration
 - [ ] Add Kubernetes manifests, health probes, resource requests and limits
 - [ ] Add Argo CD GitOps configuration
